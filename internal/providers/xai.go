@@ -13,16 +13,18 @@ import (
 // XAIProvider handles xAI's Grok API.
 // xAI uses an OpenAI-compatible format with its own endpoint.
 type XAIProvider struct {
-	apiKey string
-	models []string
-	client *http.Client
+	apiKey       string
+	models       []string
+	client       *http.Client
+	streamClient *http.Client
 }
 
 func NewXAIProvider(apiKey string) *XAIProvider {
 	return &XAIProvider{
-		apiKey: apiKey,
-		models: []string{"grok-2", "grok-2-mini"},
-		client: &http.Client{Timeout: 120 * time.Second},
+		apiKey:       apiKey,
+		models:       []string{"grok-2", "grok-2-mini"},
+		client:       &http.Client{Timeout: 120 * time.Second},
+		streamClient: &http.Client{},
 	}
 }
 
@@ -77,5 +79,7 @@ func (p *XAIProvider) ChatCompletion(ctx context.Context, req ChatRequest) (*Cha
 
 // ChatCompletionStream implements StreamProvider — xAI uses OpenAI-compatible SSE.
 func (p *XAIProvider) ChatCompletionStream(ctx context.Context, req ChatRequest, w http.ResponseWriter) (*Usage, error) {
-	return OpenAIPassthroughStream(ctx, "https://api.x.ai/v1/chat/completions", p.apiKey, req, w)
+	return openAIPassthroughStreamWithClient(
+		ctx, p.streamClient, "https://api.x.ai/v1/chat/completions", p.apiKey, req, w,
+	)
 }

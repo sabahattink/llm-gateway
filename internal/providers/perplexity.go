@@ -13,16 +13,18 @@ import (
 // PerplexityProvider handles Perplexity's Sonar API.
 // Perplexity uses an OpenAI-compatible format.
 type PerplexityProvider struct {
-	apiKey string
-	models []string
-	client *http.Client
+	apiKey       string
+	models       []string
+	client       *http.Client
+	streamClient *http.Client
 }
 
 func NewPerplexityProvider(apiKey string) *PerplexityProvider {
 	return &PerplexityProvider{
-		apiKey: apiKey,
-		models: []string{"sonar-large", "sonar-small"},
-		client: &http.Client{Timeout: 120 * time.Second},
+		apiKey:       apiKey,
+		models:       []string{"sonar-large", "sonar-small"},
+		client:       &http.Client{Timeout: 120 * time.Second},
+		streamClient: &http.Client{},
 	}
 }
 
@@ -77,5 +79,7 @@ func (p *PerplexityProvider) ChatCompletion(ctx context.Context, req ChatRequest
 
 // ChatCompletionStream implements StreamProvider — Perplexity uses OpenAI-compatible SSE.
 func (p *PerplexityProvider) ChatCompletionStream(ctx context.Context, req ChatRequest, w http.ResponseWriter) (*Usage, error) {
-	return OpenAIPassthroughStream(ctx, "https://api.perplexity.ai/chat/completions", p.apiKey, req, w)
+	return openAIPassthroughStreamWithClient(
+		ctx, p.streamClient, "https://api.perplexity.ai/chat/completions", p.apiKey, req, w,
+	)
 }

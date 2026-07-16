@@ -13,9 +13,10 @@ import (
 // MistralProvider handles Mistral AI's chat API.
 // Mistral's API is very close to OpenAI's format but has its own endpoint.
 type MistralProvider struct {
-	apiKey string
-	models []string
-	client *http.Client
+	apiKey       string
+	models       []string
+	client       *http.Client
+	streamClient *http.Client
 }
 
 func NewMistralProvider(apiKey string) *MistralProvider {
@@ -29,7 +30,8 @@ func NewMistralProvider(apiKey string) *MistralProvider {
 			"codestral",
 			"codestral-latest",
 		},
-		client: &http.Client{Timeout: 120 * time.Second},
+		client:       &http.Client{Timeout: 120 * time.Second},
+		streamClient: &http.Client{},
 	}
 }
 
@@ -85,5 +87,7 @@ func (p *MistralProvider) ChatCompletion(ctx context.Context, req ChatRequest) (
 
 // ChatCompletionStream implements StreamProvider — Mistral uses OpenAI-compatible SSE.
 func (p *MistralProvider) ChatCompletionStream(ctx context.Context, req ChatRequest, w http.ResponseWriter) (*Usage, error) {
-	return OpenAIPassthroughStream(ctx, "https://api.mistral.ai/v1/chat/completions", p.apiKey, req, w)
+	return openAIPassthroughStreamWithClient(
+		ctx, p.streamClient, "https://api.mistral.ai/v1/chat/completions", p.apiKey, req, w,
+	)
 }

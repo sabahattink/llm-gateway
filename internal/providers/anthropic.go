@@ -16,9 +16,10 @@ const anthropicAPIVersion = "2023-06-01"
 
 // AnthropicProvider handles the Anthropic Messages API.
 type AnthropicProvider struct {
-	apiKey string
-	models []string
-	client *http.Client
+	apiKey       string
+	models       []string
+	client       *http.Client
+	streamClient *http.Client
 }
 
 func NewAnthropicProvider(apiKey string) *AnthropicProvider {
@@ -35,7 +36,8 @@ func NewAnthropicProvider(apiKey string) *AnthropicProvider {
 			"claude-sonnet-4-20250514",
 			"claude-3-haiku-20240307",
 		},
-		client: &http.Client{Timeout: 120 * time.Second},
+		client:       &http.Client{Timeout: 120 * time.Second},
+		streamClient: &http.Client{},
 	}
 }
 
@@ -246,8 +248,7 @@ func (p *AnthropicProvider) ChatCompletionStream(ctx context.Context, req ChatRe
 	httpReq.Header.Set("x-api-key", p.apiKey)
 	httpReq.Header.Set("anthropic-version", anthropicAPIVersion)
 
-	client := &http.Client{} // No timeout for streaming
-	resp, err := client.Do(httpReq)
+	resp, err := p.streamClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("anthropic stream request failed: %w", err)
 	}
@@ -280,7 +281,7 @@ func (p *AnthropicProvider) ChatCompletionStream(ctx context.Context, req ChatRe
 
 		var event map[string]any
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			continue
+			return usage, fmt.Errorf("decode anthropic stream event: %w", err)
 		}
 
 		eventType, _ := event["type"].(string)

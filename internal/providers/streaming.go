@@ -73,6 +73,17 @@ func WriteSSEChunk(w http.ResponseWriter, chunk StreamChunk) error {
 // and passes through SSE events directly to the client.
 // Returns aggregated Usage if available from the stream.
 func OpenAIPassthroughStream(ctx context.Context, endpoint, apiKey string, req ChatRequest, w http.ResponseWriter) (*Usage, error) {
+	return openAIPassthroughStreamWithClient(ctx, &http.Client{}, endpoint, apiKey, req, w)
+}
+
+func openAIPassthroughStreamWithClient(
+	ctx context.Context,
+	client *http.Client,
+	endpoint string,
+	apiKey string,
+	req ChatRequest,
+	w http.ResponseWriter,
+) (*Usage, error) {
 	req.Stream = true
 
 	body, err := json.Marshal(req)
@@ -90,8 +101,6 @@ func OpenAIPassthroughStream(ctx context.Context, endpoint, apiKey string, req C
 		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 
-	// No timeout on client — streaming can be long; rely on context cancellation
-	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)

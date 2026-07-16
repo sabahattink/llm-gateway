@@ -14,11 +14,12 @@ import (
 // OpenAIProvider handles OpenAI and all OpenAI-compatible APIs:
 // Groq, Ollama, LM Studio, vLLM, Together AI.
 type OpenAIProvider struct {
-	name    string
-	baseURL string
-	apiKey  string
-	models  []string
-	client  *http.Client
+	name         string
+	baseURL      string
+	apiKey       string
+	models       []string
+	client       *http.Client
+	streamClient *http.Client
 }
 
 type OpenAIConfig struct {
@@ -37,6 +38,7 @@ func NewOpenAIProvider(cfg OpenAIConfig) *OpenAIProvider {
 		client: &http.Client{
 			Timeout: 120 * time.Second,
 		},
+		streamClient: &http.Client{},
 	}
 }
 
@@ -96,5 +98,5 @@ func (p *OpenAIProvider) ChatCompletion(ctx context.Context, req ChatRequest) (*
 // ChatCompletionStream implements StreamProvider for OpenAI-compatible APIs.
 func (p *OpenAIProvider) ChatCompletionStream(ctx context.Context, req ChatRequest, w http.ResponseWriter) (*Usage, error) {
 	url := p.baseURL + "/v1/chat/completions"
-	return OpenAIPassthroughStream(ctx, url, p.apiKey, req, w)
+	return openAIPassthroughStreamWithClient(ctx, p.streamClient, url, p.apiKey, req, w)
 }

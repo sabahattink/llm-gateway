@@ -14,16 +14,18 @@ import (
 
 // GeminiProvider handles Google Gemini API.
 type GeminiProvider struct {
-	apiKey string
-	models []string
-	client *http.Client
+	apiKey       string
+	models       []string
+	client       *http.Client
+	streamClient *http.Client
 }
 
 func NewGeminiProvider(apiKey string) *GeminiProvider {
 	return &GeminiProvider{
-		apiKey: apiKey,
-		models: []string{"gemini-2.0-flash", "gemini-1.5-pro"},
-		client: &http.Client{Timeout: 120 * time.Second},
+		apiKey:       apiKey,
+		models:       []string{"gemini-2.0-flash", "gemini-1.5-pro"},
+		client:       &http.Client{Timeout: 120 * time.Second},
+		streamClient: &http.Client{},
 	}
 }
 
@@ -115,6 +117,9 @@ func (p *GeminiProvider) ChatCompletion(ctx context.Context, req ChatRequest) (*
 			Role:  role,
 			Parts: []geminiPart{{Text: text}},
 		})
+	}
+	if len(gReq.Contents) == 0 {
+		return nil, fmt.Errorf("gemini requires at least one non-system message")
 	}
 
 	body, err := json.Marshal(gReq)
@@ -222,6 +227,9 @@ func (p *GeminiProvider) ChatCompletionStream(ctx context.Context, req ChatReque
 			Parts: []geminiPart{{Text: text}},
 		})
 	}
+	if len(gReq.Contents) == 0 {
+		return nil, fmt.Errorf("gemini requires at least one non-system message")
+	}
 
 	body, err := json.Marshal(gReq)
 	if err != nil {
@@ -238,8 +246,7 @@ func (p *GeminiProvider) ChatCompletionStream(ctx context.Context, req ChatReque
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(httpReq)
+	resp, err := p.streamClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("gemini stream request failed: %w", err)
 	}
@@ -268,7 +275,7 @@ func (p *GeminiProvider) ChatCompletionStream(ctx context.Context, req ChatReque
 		data := strings.TrimPrefix(line, "data: ")
 		var gResp geminiResponse
 		if err := json.Unmarshal([]byte(data), &gResp); err != nil {
-			continue
+			return usage, fmt.Errorf("decode gemini stream event: %w", err)
 		}
 
 		// Extract text from candidates

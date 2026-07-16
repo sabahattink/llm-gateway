@@ -260,3 +260,238 @@ func TestCohereChatCompletionRequiresUserMessage(t *testing.T) {
 		t.Fatalf("ChatCompletion() error = %v", err)
 	}
 }
+
+func TestAnthropicChatCompletionStreamConvertsEvents(t *testing.T) {
+	provider := NewAnthropicProvider("anthropic-key")
+	provider.streamClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		var body anthropicRequest
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if !body.Stream || body.System != "Be concise." || len(body.Messages) != 1 {
+			t.Fatalf("unexpected Anthropic stream request: %#v", body)
+		}
+
+		return providerResponse(http.StatusOK, strings.Join([]string{
+			`data: {"type":"message_start","message":{"id":"msg-stream","model":"claude-sonnet-4-6","usage":{"input_tokens":4}}}`,
+			"",
+			`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}`,
+			"",
+			`data: {"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":2}}`,
+			"",
+			`data: {"type":"message_stop"}`,
+			"",
+		}, "\n")), nil
+	})}
+
+	rec := httptest.NewRecorder()
+	usage, err := provider.ChatCompletionStream(context.Background(), ChatRequest{
+		Model:    "claude-sonnet-4-6",
+		Messages: testMessages(),
+	}, rec)
+	if err != nil {
+		t.Fatalf("ChatCompletionStream() error = %v", err)
+	}
+	if usage == nil || usage.PromptTokens != 4 || usage.CompletionTokens != 2 || usage.TotalTokens != 6 {
+		t.Fatalf("usage = %#v", usage)
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{`"role":"assistant"`, `"content":"Hello"`, `"finish_reason":"length"`, "data: [DONE]"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("stream body missing %q: %s", expected, body)
+		}
+	}
+}
+
+func TestGeminiChatCompletionStreamConvertsEvents(t *testing.T) {
+	provider := NewGeminiProvider("gemini-key")
+	provider.streamClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/v1beta/models/gemini-2.0-flash:streamGenerateContent" ||
+			req.URL.Query().Get("alt") != "sse" ||
+			req.URL.Query().Get("key") != "gemini-key" {
+			t.Fatalf("unexpected Gemini stream URL: %s", req.URL)
+		}
+		return providerResponse(http.StatusOK, strings.Join([]string{
+			`data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Hello"}]}}]}`,
+			"",
+			`data: {"candidates":[{"content":{"role":"model","parts":[]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2,"totalTokenCount":7}}`,
+			"",
+		}, "\n")), nil
+	})}
+
+	rec := httptest.NewRecorder()
+	usage, err := provider.ChatCompletionStream(context.Background(), ChatRequest{
+		Model:    "gemini-2.0-flash",
+		Messages: testMessages(),
+	}, rec)
+	if err != nil {
+		t.Fatalf("ChatCompletionStream() error = %v", err)
+	}
+	if usage == nil || usage.TotalTokens != 7 {
+		t.Fatalf("usage = %#v", usage)
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{`"role":"assistant"`, `"content":"Hello"`, `"finish_reason":"stop"`, "data: [DONE]"} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("stream body missing %q: %s", expected, body)
+		}
+	}
+}
+
+func TestNativeStreamsRejectMalformedEvents(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(*http.Client) error
+		want string
+	}{
+		{
+			name: "anthropic",
+			run: func(client *http.Client) error {
+				provider := NewAnthropicProvider("key")
+				provider.streamClient = client
+				_, err := provider.ChatCompletionStream(context.Background(), ChatRequest{
+					Model: "claude-sonnet-4-6", Messages: testMessages(),
+				}, httptest.NewRecorder())
+				return err
+			},
+			want: "decode anthropic stream event",
+		},
+		{
+			name: "gemini",
+			run: func(client *http.Client) error {
+				provider := NewGeminiProvider("key")
+				provider.streamClient = client
+				_, err := provider.ChatCompletionStream(context.Background(), ChatRequest{
+					Model: "gemini-2.0-flash", Messages: testMessages(),
+				}, httptest.NewRecorder())
+				return err
+			},
+			want: "decode gemini stream event",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return providerResponse(http.StatusOK, "data: {not-json}\n\n"), nil
+			})}
+			err := test.run(client)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestGeminiRequiresConversationMessage(t *testing.T) {
+	req := ChatRequest{
+		Model: "gemini-2.0-flash",
+		Messages: []Message{
+			{Role: "system", Content: NewTextContent("Be concise.")},
+		},
+	}
+	provider := NewGeminiProvider("key")
+
+	if _, err := provider.ChatCompletion(context.Background(), req); err == nil ||
+		!strings.Contains(err.Error(), "requires at least one non-system message") {
+		t.Fatalf("ChatCompletion() error = %v", err)
+	}
+	if _, err := provider.ChatCompletionStream(context.Background(), req, httptest.NewRecorder()); err == nil ||
+		!strings.Contains(err.Error(), "requires at least one non-system message") {
+		t.Fatalf("ChatCompletionStream() error = %v", err)
+	}
+}
+
+func TestCompatibleProviderEndpoints(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		run      func(*http.Client) (*ChatResponse, error)
+		stream   func(*http.Client, http.ResponseWriter) (*Usage, error)
+	}{
+		{
+			name: "mistral", endpoint: "https://api.mistral.ai/v1/chat/completions",
+			run: func(client *http.Client) (*ChatResponse, error) {
+				provider := NewMistralProvider("test-key")
+				provider.client = client
+				return provider.ChatCompletion(context.Background(), ChatRequest{Model: "mistral-large", Messages: testMessages()})
+			},
+			stream: func(client *http.Client, w http.ResponseWriter) (*Usage, error) {
+				provider := NewMistralProvider("test-key")
+				provider.streamClient = client
+				return provider.ChatCompletionStream(context.Background(), ChatRequest{Model: "mistral-large", Messages: testMessages()}, w)
+			},
+		},
+		{
+			name: "xai", endpoint: "https://api.x.ai/v1/chat/completions",
+			run: func(client *http.Client) (*ChatResponse, error) {
+				provider := NewXAIProvider("test-key")
+				provider.client = client
+				return provider.ChatCompletion(context.Background(), ChatRequest{Model: "grok-2", Messages: testMessages()})
+			},
+			stream: func(client *http.Client, w http.ResponseWriter) (*Usage, error) {
+				provider := NewXAIProvider("test-key")
+				provider.streamClient = client
+				return provider.ChatCompletionStream(context.Background(), ChatRequest{Model: "grok-2", Messages: testMessages()}, w)
+			},
+		},
+		{
+			name: "perplexity", endpoint: "https://api.perplexity.ai/chat/completions",
+			run: func(client *http.Client) (*ChatResponse, error) {
+				provider := NewPerplexityProvider("test-key")
+				provider.client = client
+				return provider.ChatCompletion(context.Background(), ChatRequest{Model: "sonar-large", Messages: testMessages()})
+			},
+			stream: func(client *http.Client, w http.ResponseWriter) (*Usage, error) {
+				provider := NewPerplexityProvider("test-key")
+				provider.streamClient = client
+				return provider.ChatCompletionStream(context.Background(), ChatRequest{Model: "sonar-large", Messages: testMessages()}, w)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			requestCount := 0
+			client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				requestCount++
+				if req.URL.String() != test.endpoint {
+					t.Fatalf("URL = %s, want %s", req.URL, test.endpoint)
+				}
+				if req.Header.Get("Authorization") != "Bearer test-key" {
+					t.Fatalf("Authorization = %q", req.Header.Get("Authorization"))
+				}
+
+				var body ChatRequest
+				if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+					t.Fatalf("decode request: %v", err)
+				}
+				if requestCount == 1 {
+					return providerResponse(http.StatusOK, `{
+						"id":"chat-1","object":"chat.completion","model":"test",
+						"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],
+						"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}
+					}`), nil
+				}
+				if !body.Stream {
+					t.Fatal("stream request did not set stream=true")
+				}
+				return providerResponse(http.StatusOK,
+					"data: {\"id\":\"chunk-1\",\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1,\"total_tokens\":2}}\n\ndata: [DONE]\n\n",
+				), nil
+			})}
+
+			resp, err := test.run(client)
+			if err != nil || resp.Usage.TotalTokens != 2 {
+				t.Fatalf("ChatCompletion() response=%#v error=%v", resp, err)
+			}
+			usage, err := test.stream(client, httptest.NewRecorder())
+			if err != nil || usage == nil || usage.TotalTokens != 2 {
+				t.Fatalf("ChatCompletionStream() usage=%#v error=%v", usage, err)
+			}
+			if requestCount != 2 {
+				t.Fatalf("request count = %d, want 2", requestCount)
+			}
+		})
+	}
+}
