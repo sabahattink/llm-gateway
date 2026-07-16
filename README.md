@@ -101,11 +101,16 @@ The gateway resolves the provider from the model name automatically — no routi
 ### Docker
 
 ```bash
-git clone https://github.com/sabahattink/llm-gateway.git
-cd llm-gateway
-cp .env.example .env
-# Set LLM_GATEWAY_API_KEY in .env before exposing the gateway.
-docker compose up --build
+docker volume create llm-gateway-data
+docker run --name llm-gateway \
+  --restart unless-stopped \
+  --read-only \
+  --tmpfs /tmp \
+  --security-opt no-new-privileges:true \
+  -p 8080:8080 \
+  -e LLM_GATEWAY_API_KEY="$LLM_GATEWAY_API_KEY" \
+  -v llm-gateway-data:/data \
+  ghcr.io/sabahattink/llm-gateway:v1.1.0
 ```
 
 1. Open `http://localhost:8080`
@@ -114,6 +119,9 @@ docker compose up --build
 4. Send authenticated requests to `http://localhost:8080/v1/chat/completions`
 
 Configuration is environment-based; no YAML or external database is required.
+
+To build locally instead, clone the repository, copy `.env.example` to `.env`,
+set `LLM_GATEWAY_API_KEY`, and run `docker compose up --build`.
 
 > **Remote setup:** if you deploy on a server first, use the one-time token printed at startup:
 > ```
@@ -347,6 +355,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Report
 security issues privately as described in [SECURITY.md](SECURITY.md).
 Release changes are recorded in [CHANGELOG.md](CHANGELOG.md); maintainers use
 the documented [release process](docs/releasing.md).
+Community participation is governed by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 
