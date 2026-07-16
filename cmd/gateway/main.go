@@ -25,14 +25,19 @@ var (
 	globalRegistry *providers.Registry
 	globalStore    *storage.Store
 	registryMu     sync.Mutex
+	version        = "dev"
 )
 
 func main() {
 	port := envOr("PORT", "8080")
 	dbPath := envOr("DB_PATH", "gateway.db")
 
-	// Handle --reset-password flag
+	// Handle commands that do not start the server.
 	for _, arg := range os.Args[1:] {
+		if arg == "--version" || arg == "-version" {
+			fmt.Println(versionOutput())
+			return
+		}
 		if arg == "--reset-password" {
 			store, err := storage.New(dbPath)
 			if err != nil {
@@ -177,6 +182,10 @@ func main() {
 		log.Fatalf("server failed: %v", err)
 	}
 	log.Printf("LLM Gateway stopped")
+}
+
+func versionOutput() string {
+	return "llm-gateway " + version
 }
 
 func reloadProviders() {

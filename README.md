@@ -1,12 +1,17 @@
 # LLM Gateway
 
-> Use your existing OpenAI client to call Claude, Gemini, or Ollama — without changing your code.
+One self-hosted, OpenAI-compatible API for Claude, GPT, Gemini, Groq, Ollama,
+and other major LLM providers. Switch models without rewriting application
+code.
 
-One OpenAI-compatible API for all major LLM providers.
+[![CI](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/sabahattink/llm-gateway?style=flat-square)](https://github.com/sabahattink/llm-gateway/releases)
+[![Go 1.26](https://img.shields.io/badge/go-1.26-00ADD8?style=flat-square&logo=go)](https://go.dev)
+[![License: MIT](https://img.shields.io/github/license/sabahattink/llm-gateway?style=flat-square)](LICENSE)
 
-Use Claude, GPT, Gemini, Groq, or Ollama through the same client.
-
-Switch providers without rewriting your app.
+<p align="center">
+  <img src="docs/screenshots/dashboard-dark.png" alt="LLM Gateway dashboard" width="860">
+</p>
 
 ```bash
 git clone https://github.com/sabahattink/llm-gateway.git
@@ -15,11 +20,6 @@ cp .env.example .env
 # Set LLM_GATEWAY_API_KEY in .env before exposing the gateway.
 docker compose up --build
 ```
-
-[![CI](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/sabahattink/llm-gateway?style=flat-square)](https://github.com/sabahattink/llm-gateway/releases)
-[![Go 1.26](https://img.shields.io/badge/go-1.26-00ADD8?style=flat-square&logo=go)](https://go.dev)
-[![License: MIT](https://img.shields.io/github/license/sabahattink/llm-gateway?style=flat-square)](LICENSE)
 
 ---
 
@@ -127,6 +127,12 @@ git clone https://github.com/sabahattink/llm-gateway.git
 cd llm-gateway
 go build -o llm-gateway ./cmd/gateway
 ./llm-gateway
+```
+
+Release archives report their embedded version:
+
+```bash
+./llm-gateway --version
 ```
 
 ### Streaming

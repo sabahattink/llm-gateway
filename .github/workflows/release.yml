@@ -50,7 +50,8 @@ jobs:
             trap 'rm -rf "$package_dir"' RETURN
 
             CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
-              go build -trimpath -ldflags="-s -w" \
+              go build -trimpath \
+              -ldflags="-s -w -X main.version=$GITHUB_REF_NAME" \
               -o "$package_dir/llm-gateway$extension" ./cmd/gateway
 
             cp -R web README.md CHANGELOG.md LICENSE "$package_dir/"

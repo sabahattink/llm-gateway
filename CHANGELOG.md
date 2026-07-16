@@ -6,12 +6,15 @@ The project follows Semantic Versioning.
 
 ## Unreleased
 
+## 1.1.0 - 2026-07-16
+
 ### Added
 
 - Bearer authentication for the public chat-completions endpoint.
 - Hardened container runtime checks in CI.
 - Automated cross-platform release archives and SHA-256 checksums.
 - Integration coverage for native and OpenAI-compatible providers.
+- Versioned cross-platform binaries for Linux, macOS, and Windows.
 
 ### Changed
 
