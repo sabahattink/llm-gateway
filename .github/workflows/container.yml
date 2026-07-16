@@ -19,6 +19,10 @@ permissions:
   id-token: write
   attestations: write
 
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -29,6 +33,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.version || github.ref }}
+
+      - name: Resolve source revision
+        id: source
+        run: echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -61,6 +71,11 @@ jobs:
             org.opencontainers.image.title=LLM Gateway
             org.opencontainers.image.description=Self-hosted OpenAI-compatible gateway for major LLM providers
             org.opencontainers.image.vendor=Sabahattin Kalkan
+            org.opencontainers.image.revision=${{ steps.source.outputs.revision }}
+            org.opencontainers.image.version=${{ inputs.version || github.ref_name }}
+          annotations: |
+            org.opencontainers.image.revision=${{ steps.source.outputs.revision }}
+            org.opencontainers.image.version=${{ inputs.version || github.ref_name }}
 
       - name: Build and publish image
         uses: docker/build-push-action@v7
