@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main
+        run: |
+          git fetch origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.5
+          cache: true
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+      - name: Build release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+
+          build_archive() {
+            goos="$1"
+            goarch="$2"
+            extension="$3"
+            archive="$4"
+            package_dir="$(mktemp -d)"
+            trap 'rm -rf "$package_dir"' RETURN
+
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -trimpath -ldflags="-s -w" \
+              -o "$package_dir/llm-gateway$extension" ./cmd/gateway
+
+            cp -R web README.md CHANGELOG.md LICENSE "$package_dir/"
+
+            if [[ "$archive" == *.zip ]]; then
+              (
+                cd "$package_dir"
+                zip -qr "$GITHUB_WORKSPACE/dist/$archive" .
+              )
+            else
+              tar -C "$package_dir" -czf "dist/$archive" .
+            fi
+          }
+
+          build_archive linux amd64 "" "llm-gateway_${GITHUB_REF_NAME}_linux_amd64.tar.gz"
+          build_archive linux arm64 "" "llm-gateway_${GITHUB_REF_NAME}_linux_arm64.tar.gz"
+          build_archive darwin amd64 "" "llm-gateway_${GITHUB_REF_NAME}_darwin_amd64.tar.gz"
+          build_archive darwin arm64 "" "llm-gateway_${GITHUB_REF_NAME}_darwin_arm64.tar.gz"
+          build_archive windows amd64 ".exe" "llm-gateway_${GITHUB_REF_NAME}_windows_amd64.zip"
+
+          (
+            cd dist
+            sha256sum llm-gateway_* > SHA256SUMS
+          )
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --verify-tag \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi

@@ -339,6 +339,8 @@ web/                         admin UI (dashboard, analytics, settings, login, se
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Report
 security issues privately as described in [SECURITY.md](SECURITY.md).
+Release changes are recorded in [CHANGELOG.md](CHANGELOG.md); maintainers use
+the documented [release process](docs/releasing.md).
 
 ---
 
