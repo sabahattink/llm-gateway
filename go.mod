@@ -2,6 +2,8 @@ module github.com/sabahattink/llm-gateway
 
 go 1.25.0
 
+toolchain go1.25.12
+
 require modernc.org/sqlite v1.34.5
 
 require (
