@@ -160,3 +160,45 @@ func TestRequestIsHTTPSAndLoopbackWithoutProxy(t *testing.T) {
 		t.Fatal("RequestIsHTTPS() = false for TLS request")
 	}
 }
+
+func TestAPIKeyAuth(t *testing.T) {
+	handler := APIKeyAuth(
+		"0123456789abcdef0123456789abcdef",
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
+
+	tests := []struct {
+		name          string
+		authorization string
+		wantStatus    int
+	}{
+		{name: "missing", wantStatus: http.StatusUnauthorized},
+		{name: "wrong scheme", authorization: "Basic abc", wantStatus: http.StatusUnauthorized},
+		{name: "wrong key", authorization: "Bearer wrong", wantStatus: http.StatusUnauthorized},
+		{name: "extra token data", authorization: "Bearer 0123456789abcdef0123456789abcdef extra", wantStatus: http.StatusUnauthorized},
+		{name: "valid", authorization: "Bearer 0123456789abcdef0123456789abcdef", wantStatus: http.StatusNoContent},
+		{name: "case insensitive scheme", authorization: "bearer 0123456789abcdef0123456789abcdef", wantStatus: http.StatusNoContent},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+			if test.authorization != "" {
+				req.Header.Set("Authorization", test.authorization)
+			}
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d", rec.Code, test.wantStatus)
+			}
+			if test.wantStatus == http.StatusUnauthorized &&
+				rec.Header().Get("WWW-Authenticate") != `Bearer realm="llm-gateway"` {
+				t.Fatalf("WWW-Authenticate = %q", rec.Header().Get("WWW-Authenticate"))
+			}
+		})
+	}
+}

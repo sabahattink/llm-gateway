@@ -74,8 +74,17 @@ func main() {
 	// Setup HTTP mux
 	mux := http.NewServeMux()
 
-	// Public API endpoints (no auth needed)
+	// Public API endpoint with optional Bearer authentication.
 	var chatHandler http.Handler = http.HandlerFunc(router.HandleChatCompletion)
+	if apiKey := os.Getenv("LLM_GATEWAY_API_KEY"); apiKey != "" {
+		if len(apiKey) < 32 {
+			log.Fatalf("LLM_GATEWAY_API_KEY must be at least 32 characters")
+		}
+		chatHandler = middleware.APIKeyAuth(apiKey, chatHandler)
+		log.Printf("Public API authentication: enabled")
+	} else {
+		log.Printf("WARNING: Public API authentication is disabled; set LLM_GATEWAY_API_KEY before exposing the gateway")
+	}
 	if rateLimit := envInt("PUBLIC_RATE_LIMIT_RPM", 60); rateLimit > 0 {
 		chatHandler = middleware.NewRateLimiter(rateLimit, time.Minute).Middleware(chatHandler)
 		log.Printf("Public chat rate limit: %d requests/minute per IP", rateLimit)

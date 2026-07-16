@@ -11,12 +11,14 @@ Switch providers without rewriting your app.
 ```bash
 git clone https://github.com/sabahattink/llm-gateway.git
 cd llm-gateway
+cp .env.example .env
+# Set LLM_GATEWAY_API_KEY in .env before exposing the gateway.
 docker compose up --build
 ```
 
 [![CI](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/sabahattink/llm-gateway?style=flat-square)](https://github.com/sabahattink/llm-gateway/releases)
-[![Go 1.25](https://img.shields.io/badge/go-1.25-00ADD8?style=flat-square&logo=go)](https://golang.org)
+[![Go 1.26](https://img.shields.io/badge/go-1.26-00ADD8?style=flat-square&logo=go)](https://go.dev)
 [![License: MIT](https://img.shields.io/github/license/sabahattink/llm-gateway?style=flat-square)](LICENSE)
 
 ---
@@ -26,11 +28,13 @@ docker compose up --build
 Your app already speaks OpenAI. Point it at the gateway, change the model name, done.
 
 ```python
+import os
+
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:8080/v1",
-    api_key="any-string",
+    api_key=os.environ["LLM_GATEWAY_API_KEY"],
 )
 
 # Claude
@@ -48,6 +52,7 @@ Same client. Same code. Any provider. Works with the OpenAI SDK in Python, Node.
 ```bash
 # What it looks like over the wire
 $ curl http://localhost:8080/v1/chat/completions \
+    -H "Authorization: Bearer $LLM_GATEWAY_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"Hello"}]}'
 
@@ -58,6 +63,8 @@ $ curl http://localhost:8080/v1/chat/completions \
 
 # Change the model, get a different provider — nothing else changes
 $ curl http://localhost:8080/v1/chat/completions \
+    -H "Authorization: Bearer $LLM_GATEWAY_API_KEY" \
+    -H "Content-Type: application/json" \
     -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'
 
 # X-LLM-Provider: openai
@@ -96,15 +103,17 @@ The gateway resolves the provider from the model name automatically — no routi
 ```bash
 git clone https://github.com/sabahattink/llm-gateway.git
 cd llm-gateway
+cp .env.example .env
+# Set LLM_GATEWAY_API_KEY in .env before exposing the gateway.
 docker compose up --build
 ```
 
 1. Open `http://localhost:8080`
 2. Set your admin password
 3. Add provider API keys in **Settings**
-4. Send requests to `http://localhost:8080/v1/chat/completions`
+4. Send authenticated requests to `http://localhost:8080/v1/chat/completions`
 
-No config files. No YAML. No Python environment.
+Configuration is environment-based; no YAML or external database is required.
 
 > **Remote setup:** if you deploy on a server first, use the one-time token printed at startup:
 > ```
@@ -124,6 +133,7 @@ go build -o llm-gateway ./cmd/gateway
 
 ```bash
 curl -N http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $LLM_GATEWAY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "claude-sonnet-4-6",
@@ -205,6 +215,7 @@ PUBLIC_RATE_LIMIT_RPM=60          # 0 disables rate limiting
 
 # Security
 LLM_GATEWAY_ENCRYPTION_KEY=       # auto-generated if unset
+LLM_GATEWAY_API_KEY=              # Bearer token for /v1/chat/completions; 32+ characters
 LLM_GATEWAY_TRUST_PROXY_HEADERS=false
 
 # Cloud providers
@@ -235,11 +246,16 @@ services:
     build: .
     ports:
       - "8080:8080"
+    environment:
+      LLM_GATEWAY_API_KEY: ${LLM_GATEWAY_API_KEY:-}
     volumes:
       - gateway-data:/data
-    env_file:
-      - .env
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   gateway-data:
@@ -251,7 +267,7 @@ volumes:
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/v1/chat/completions` | No | OpenAI-compatible proxy |
+| `POST` | `/v1/chat/completions` | Bearer* | OpenAI-compatible proxy |
 | `GET` | `/health` | No | Status and registered providers |
 | `GET` | `/admin` | Yes | Dashboard |
 | `GET` | `/admin/analytics` | Yes | Analytics |
@@ -266,12 +282,16 @@ volumes:
 
 Responses include `X-LLM-Provider` and `X-LLM-Latency-Ms` headers.
 
+`*` Bearer authentication is enabled when `LLM_GATEWAY_API_KEY` is set. Set it
+to a random value of at least 32 characters before exposing the gateway.
+
 ---
 
 ## Security
 
 - **Passwords** — bcrypt cost 12
 - **API keys** — AES-256-GCM, unique nonce per key, encrypted in SQLite
+- **Gateway API** — optional constant-time Bearer-token authentication; required for internet-facing deployments
 - **Sessions** — 32-byte random tokens, SHA-256 hashed in DB, 24 h expiry
 - **Rate limiting** — per-IP token bucket on all public endpoints
 - **Proxy headers** — `X-Forwarded-For` trust disabled by default

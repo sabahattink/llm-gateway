@@ -39,6 +39,8 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    env:
+      LLM_GATEWAY_API_KEY: 0123456789abcdef0123456789abcdef
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -72,6 +74,12 @@ jobs:
 
           test "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" = "healthy"
           curl --fail --silent --show-error http://127.0.0.1:8080/health >/dev/null
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:8080/v1/chat/completions)" = "401"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer $LLM_GATEWAY_API_KEY" \
+            http://127.0.0.1:8080/v1/chat/completions)" = "400"
 
       - name: Show container logs
         if: failure()
