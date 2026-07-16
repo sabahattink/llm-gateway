@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/scuton-technology/llm-gateway/internal/middleware"
-	"github.com/scuton-technology/llm-gateway/internal/storage"
+	"github.com/sabahattink/llm-gateway/internal/middleware"
+	"github.com/sabahattink/llm-gateway/internal/storage"
 	"golang.org/x/crypto/bcrypt"
 )
 

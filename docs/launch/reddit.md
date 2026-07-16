@@ -43,7 +43,7 @@ What it includes right now:
 It is aimed at developers who want something smaller and simpler to self-host, especially if they already use the OpenAI SDK and want to compare hosted and local providers behind one endpoint.
 
 Repo:
-`https://github.com/scuton-technology/llm-gateway`
+`https://github.com/sabahattink/llm-gateway`
 
 Happy to get feedback on:
 

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/scuton-technology/llm-gateway/internal/middleware"
-	"github.com/scuton-technology/llm-gateway/internal/storage"
+	"github.com/sabahattink/llm-gateway/internal/middleware"
+	"github.com/sabahattink/llm-gateway/internal/storage"
 )
 
 const settingsBodyLimit = 64 << 10

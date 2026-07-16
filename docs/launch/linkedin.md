@@ -27,7 +27,7 @@ What is in the repo today:
 - SQLite-based storage
 
 Repository:
-`https://github.com/scuton-technology/llm-gateway`
+`https://github.com/sabahattink/llm-gateway`
 
 If you work on developer infrastructure, LLM apps, or self-hosted AI tooling, I would appreciate feedback on the onboarding flow, provider coverage, and compatibility expectations.
 

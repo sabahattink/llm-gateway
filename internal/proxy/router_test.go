@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/scuton-technology/llm-gateway/internal/providers"
-	"github.com/scuton-technology/llm-gateway/internal/storage"
+	"github.com/sabahattink/llm-gateway/internal/providers"
+	"github.com/sabahattink/llm-gateway/internal/storage"
 )
 
 func newProxyTestStore(t *testing.T) *storage.Store {

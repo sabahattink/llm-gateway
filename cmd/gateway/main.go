@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scuton-technology/llm-gateway/internal/admin"
-	"github.com/scuton-technology/llm-gateway/internal/middleware"
-	"github.com/scuton-technology/llm-gateway/internal/providers"
-	"github.com/scuton-technology/llm-gateway/internal/proxy"
-	"github.com/scuton-technology/llm-gateway/internal/storage"
+	"github.com/sabahattink/llm-gateway/internal/admin"
+	"github.com/sabahattink/llm-gateway/internal/middleware"
+	"github.com/sabahattink/llm-gateway/internal/providers"
+	"github.com/sabahattink/llm-gateway/internal/proxy"
+	"github.com/sabahattink/llm-gateway/internal/storage"
 )
 
 var (

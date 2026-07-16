@@ -1,4 +1,4 @@
-module github.com/scuton-technology/llm-gateway
+module github.com/sabahattink/llm-gateway
 
 go 1.25.0
 

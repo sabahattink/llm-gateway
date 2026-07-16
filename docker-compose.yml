@@ -6,15 +6,7 @@ services:
       - "8080:8080"
     volumes:
       - gateway-data:/data
-    env_file:
-      - .env
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.llm-gateway.rule=Host(`llm.scuton.com`)"
-      - "traefik.http.routers.llm-gateway.entrypoints=websecure"
-      - "traefik.http.routers.llm-gateway.tls.certresolver=letsencrypt"
-      - "traefik.http.services.llm-gateway.loadbalancer.server.port=8080"
 
 volumes:
   gateway-data:

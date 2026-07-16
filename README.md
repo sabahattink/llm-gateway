@@ -9,13 +9,15 @@ Use Claude, GPT, Gemini, Groq, or Ollama through the same client.
 Switch providers without rewriting your app.
 
 ```bash
-docker run -p 8080:8080 -v gateway-data:/data scutontech/llm-gateway
+git clone https://github.com/sabahattink/llm-gateway.git
+cd llm-gateway
+docker compose up --build
 ```
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/scutontech/llm-gateway?style=flat-square&logo=docker)](https://hub.docker.com/r/scutontech/llm-gateway)
-[![GitHub Release](https://img.shields.io/github/v/release/scuton-technology/llm-gateway?style=flat-square)](https://github.com/scuton-technology/llm-gateway/releases)
+[![CI](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/sabahattink/llm-gateway/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/sabahattink/llm-gateway?style=flat-square)](https://github.com/sabahattink/llm-gateway/releases)
 [![Go 1.25](https://img.shields.io/badge/go-1.25-00ADD8?style=flat-square&logo=go)](https://golang.org)
-[![License: MIT](https://img.shields.io/github/license/scuton-technology/llm-gateway?style=flat-square)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/sabahattink/llm-gateway?style=flat-square)](LICENSE)
 
 ---
 
@@ -63,10 +65,6 @@ $ curl http://localhost:8080/v1/chat/completions \
 {"id":"...","choices":[{"message":{"role":"assistant","content":"Hi there! What can I do for you?"}}],...}
 ```
 
-<p align="center">
-  <img src="docs/screenshots/demo.png" alt="Terminal demo — curl request and response" width="900">
-</p>
-
 ---
 
 ## Supported Providers
@@ -96,7 +94,9 @@ The gateway resolves the provider from the model name automatically — no routi
 ### Docker
 
 ```bash
-docker run -p 8080:8080 -v gateway-data:/data scutontech/llm-gateway
+git clone https://github.com/sabahattink/llm-gateway.git
+cd llm-gateway
+docker compose up --build
 ```
 
 1. Open `http://localhost:8080`
@@ -114,7 +114,7 @@ No config files. No YAML. No Python environment.
 ### Build From Source
 
 ```bash
-git clone https://github.com/scuton-technology/llm-gateway.git
+git clone https://github.com/sabahattink/llm-gateway.git
 cd llm-gateway
 go build -o llm-gateway ./cmd/gateway
 ./llm-gateway
@@ -232,7 +232,7 @@ VLLM_BASE_URL=http://localhost:8000
 ```yaml
 services:
   gateway:
-    image: scutontech/llm-gateway
+    build: .
     ports:
       - "8080:8080"
     volumes:
@@ -312,6 +312,13 @@ internal/
   storage/sqlite.go          WAL-mode SQLite, AES-256-GCM key encryption
 web/                         admin UI (dashboard, analytics, settings, login, setup)
 ```
+
+---
+
+## Contributing and Security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow. Report
+security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ---
 

@@ -16,7 +16,7 @@ Recommended manual assets to add before launch:
 
 If only two new assets are added, prioritize:
 
-1. **`docs/screenshots/demo.png`** — terminal demo screenshot (REFERENCED IN README — broken until added)
+1. **`docs/screenshots/demo.png`** — terminal demo screenshot for a future README update
 2. short startup-to-first-request GIF
 
 ## demo.png spec

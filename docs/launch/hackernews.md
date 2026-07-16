@@ -30,7 +30,7 @@ What I wanted from this project:
 It is not trying to be the broadest orchestration layer. The focus is a small, practical gateway for people who want one stable API in front of multiple hosted or local model providers.
 
 Repository:
-`https://github.com/scuton-technology/llm-gateway`
+`https://github.com/sabahattink/llm-gateway`
 
 Would especially appreciate feedback on:
 
@@ -51,5 +51,7 @@ Some implementation details that may be relevant:
 If you try it, the fastest path is Docker:
 
 ```bash
-docker run -p 8080:8080 -v gateway-data:/data scutontech/llm-gateway
+git clone https://github.com/sabahattink/llm-gateway.git
+cd llm-gateway
+docker compose up --build
 ```
