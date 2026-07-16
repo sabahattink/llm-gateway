@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -423,13 +424,7 @@ func (h *Handler) ServeAnalytics(w http.ResponseWriter, r *http.Request) {
 
 // HandleDailyStats returns daily aggregated stats.
 func (h *Handler) HandleDailyStats(w http.ResponseWriter, r *http.Request) {
-	days := 30
-	if d := r.URL.Query().Get("days"); d != "" {
-		fmt.Sscanf(d, "%d", &days)
-	}
-	if days > 365 {
-		days = 365
-	}
+	days := boundedQueryInt(r, "days", 30, 1, 365)
 
 	stats, err := h.store.GetDailyStats(days)
 	if err != nil {
@@ -443,13 +438,7 @@ func (h *Handler) HandleDailyStats(w http.ResponseWriter, r *http.Request) {
 
 // HandleMonthlyStats returns monthly aggregated stats.
 func (h *Handler) HandleMonthlyStats(w http.ResponseWriter, r *http.Request) {
-	months := 12
-	if m := r.URL.Query().Get("months"); m != "" {
-		fmt.Sscanf(m, "%d", &months)
-	}
-	if months > 36 {
-		months = 36
-	}
+	months := boundedQueryInt(r, "months", 12, 1, 36)
 
 	stats, err := h.store.GetMonthlyStats(months)
 	if err != nil {
@@ -463,10 +452,7 @@ func (h *Handler) HandleMonthlyStats(w http.ResponseWriter, r *http.Request) {
 
 // HandleProviderStats returns per-provider breakdown.
 func (h *Handler) HandleProviderStats(w http.ResponseWriter, r *http.Request) {
-	days := 30
-	if d := r.URL.Query().Get("days"); d != "" {
-		fmt.Sscanf(d, "%d", &days)
-	}
+	days := boundedQueryInt(r, "days", 30, 1, 365)
 
 	stats, err := h.store.GetProviderPeriodStats(days)
 	if err != nil {
@@ -480,10 +466,7 @@ func (h *Handler) HandleProviderStats(w http.ResponseWriter, r *http.Request) {
 
 // HandleModelStats returns per-model cost breakdown.
 func (h *Handler) HandleModelStats(w http.ResponseWriter, r *http.Request) {
-	days := 30
-	if d := r.URL.Query().Get("days"); d != "" {
-		fmt.Sscanf(d, "%d", &days)
-	}
+	days := boundedQueryInt(r, "days", 30, 1, 365)
 
 	stats, err := h.store.GetModelCostStats(days)
 	if err != nil {
@@ -504,4 +487,22 @@ func maskKey(key string) string {
 		return strings.Repeat("•", len(key))
 	}
 	return key[:6] + strings.Repeat("•", len(key)-10) + key[len(key)-4:]
+}
+
+func boundedQueryInt(r *http.Request, key string, fallback, minimum, maximum int) int {
+	value := r.URL.Query().Get(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	if parsed < minimum {
+		return minimum
+	}
+	if parsed > maximum {
+		return maximum
+	}
+	return parsed
 }

@@ -261,7 +261,7 @@ type Stats struct {
 }
 
 func (s *Store) GetStats(since time.Duration) (*Stats, error) {
-	cutoff := time.Now().Add(-since)
+	cutoff := sqliteTimestamp(time.Now().Add(-since))
 
 	stats := &Stats{
 		ModelBreakdown:    make(map[string]int),
@@ -337,7 +337,7 @@ func (s *Store) GetRecentLogs(limit int) ([]RequestLog, error) {
 
 // GetDailyStats returns per-day stats for the last N days.
 func (s *Store) GetDailyStats(days int) ([]PeriodStats, error) {
-	cutoff := time.Now().AddDate(0, 0, -days)
+	cutoff := sqliteTimestamp(time.Now().AddDate(0, 0, -days))
 	rows, err := s.db.Query(`
 		SELECT
 			strftime('%Y-%m-%d', timestamp) AS period,
@@ -383,7 +383,7 @@ func (s *Store) GetDailyStats(days int) ([]PeriodStats, error) {
 
 // GetMonthlyStats returns per-month stats for the last N months.
 func (s *Store) GetMonthlyStats(months int) ([]PeriodStats, error) {
-	cutoff := time.Now().AddDate(0, -months, 0)
+	cutoff := sqliteTimestamp(time.Now().AddDate(0, -months, 0))
 	rows, err := s.db.Query(`
 		SELECT
 			strftime('%Y-%m', timestamp) AS period,
@@ -428,7 +428,7 @@ func (s *Store) GetMonthlyStats(months int) ([]PeriodStats, error) {
 
 // GetProviderPeriodStats returns per-provider breakdown by day for the last N days.
 func (s *Store) GetProviderPeriodStats(days int) ([]ProviderPeriodStats, error) {
-	cutoff := time.Now().AddDate(0, 0, -days)
+	cutoff := sqliteTimestamp(time.Now().AddDate(0, 0, -days))
 	rows, err := s.db.Query(`
 		SELECT
 			strftime('%Y-%m-%d', timestamp) AS period,
@@ -457,7 +457,7 @@ func (s *Store) GetProviderPeriodStats(days int) ([]ProviderPeriodStats, error) 
 
 // GetModelCostStats returns per-model token usage for cost calculation.
 func (s *Store) GetModelCostStats(days int) ([]ModelCostStats, error) {
-	cutoff := time.Now().AddDate(0, 0, -days)
+	cutoff := sqliteTimestamp(time.Now().AddDate(0, 0, -days))
 	rows, err := s.db.Query(`
 		SELECT
 			model,
@@ -564,17 +564,21 @@ func (s *Store) CleanExpiredSessions() error {
 
 // RecordLoginAttempt records a login attempt.
 func (s *Store) RecordLoginAttempt(ip string, success bool) error {
-	successInt := 0
 	if success {
-		successInt = 1
+		_, err := s.db.Exec(`DELETE FROM login_attempts WHERE ip = ?`, ip)
+		return err
 	}
-	_, err := s.db.Exec(`INSERT INTO login_attempts (ip, success) VALUES (?, ?)`, ip, successInt)
+
+	if _, err := s.db.Exec(`DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-1 day')`); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(`INSERT INTO login_attempts (ip, success) VALUES (?, 0)`, ip)
 	return err
 }
 
 // IsIPLocked checks if an IP has too many failed attempts in the last 15 minutes.
 func (s *Store) IsIPLocked(ip string) bool {
-	cutoffStr := time.Now().Add(-15 * time.Minute).UTC().Format("2006-01-02 15:04:05")
+	cutoffStr := sqliteTimestamp(time.Now().Add(-15 * time.Minute))
 	var failCount int
 	err := s.db.QueryRow(`
 		SELECT COUNT(*) FROM login_attempts
@@ -587,7 +591,7 @@ func (s *Store) IsIPLocked(ip string) bool {
 
 // GetLockoutRemaining returns seconds remaining on lockout for an IP.
 func (s *Store) GetLockoutRemaining(ip string) int {
-	cutoffStr := time.Now().Add(-15 * time.Minute).UTC().Format("2006-01-02 15:04:05")
+	cutoffStr := sqliteTimestamp(time.Now().Add(-15 * time.Minute))
 	var lastAttemptStr string
 	err := s.db.QueryRow(`
 		SELECT MAX(attempted_at) FROM login_attempts
@@ -720,4 +724,8 @@ func (s *Store) decryptSensitive(value string) (string, error) {
 func hashSessionToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+func sqliteTimestamp(value time.Time) string {
+	return value.UTC().Format("2006-01-02 15:04:05")
 }

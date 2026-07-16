@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -12,6 +13,9 @@ type RateLimiter struct {
 	clients map[string]*bucket
 	rate    int // requests per window
 	window  time.Duration
+	now     func() time.Time
+
+	lastCleanup time.Time
 }
 
 type bucket struct {
@@ -24,6 +28,7 @@ func NewRateLimiter(rate int, window time.Duration) *RateLimiter {
 		clients: make(map[string]*bucket),
 		rate:    rate,
 		window:  window,
+		now:     time.Now,
 	}
 }
 
@@ -32,22 +37,39 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 		ip := ClientIP(r)
 
 		rl.mu.Lock()
+		now := rl.now()
+		if rl.lastCleanup.IsZero() || now.Sub(rl.lastCleanup) >= rl.window {
+			for clientIP, existing := range rl.clients {
+				if now.Sub(existing.lastReset) >= rl.window {
+					delete(rl.clients, clientIP)
+				}
+			}
+			rl.lastCleanup = now
+		}
+
 		b, exists := rl.clients[ip]
 		if !exists {
-			b = &bucket{tokens: rl.rate, lastReset: time.Now()}
+			b = &bucket{tokens: rl.rate, lastReset: now}
 			rl.clients[ip] = b
 		}
 
 		// Reset bucket if window has passed
-		if time.Since(b.lastReset) > rl.window {
+		if now.Sub(b.lastReset) >= rl.window {
 			b.tokens = rl.rate
-			b.lastReset = time.Now()
+			b.lastReset = now
 		}
 
 		if b.tokens <= 0 {
+			retryAfter := int(b.lastReset.Add(rl.window).Sub(now).Seconds())
+			if b.lastReset.Add(rl.window).After(now.Add(time.Duration(retryAfter) * time.Second)) {
+				retryAfter++
+			}
+			if retryAfter < 1 {
+				retryAfter = 1
+			}
 			rl.mu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Retry-After", "60")
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 			w.WriteHeader(http.StatusTooManyRequests)
 			w.Write([]byte(`{"error":{"message":"rate limit exceeded","type":"error","code":"rate_limit"}}`))
 			return

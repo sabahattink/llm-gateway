@@ -6,7 +6,7 @@ Thank you for helping improve LLM Gateway.
 
 Requirements:
 
-- Go 1.25.12 or newer
+- Go 1.26.5 or newer
 - Docker for container validation
 
 Before opening a pull request, run:

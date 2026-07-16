@@ -7,6 +7,11 @@ services:
     volumes:
       - gateway-data:/data
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   gateway-data:

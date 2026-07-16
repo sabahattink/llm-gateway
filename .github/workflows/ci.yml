@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: 1.26.5
           cache: true
 
       - name: Check formatting
@@ -45,3 +45,38 @@ jobs:
 
       - name: Build container image
         run: docker build --tag llm-gateway:ci .
+
+      - name: Start hardened container
+        run: docker compose up --detach --build
+
+      - name: Verify container runtime
+        run: |
+          container_id="$(docker compose ps --quiet gateway)"
+          test -n "$container_id"
+          test "$(docker inspect --format '{{.Config.User}}' "$container_id")" = "gateway:gateway"
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container_id")" = "true"
+          docker inspect --format '{{json .HostConfig.SecurityOpt}}' "$container_id" \
+            | grep -F 'no-new-privileges:true'
+
+          for attempt in $(seq 1 30); do
+            health="$(docker inspect --format '{{.State.Health.Status}}' "$container_id")"
+            if [ "$health" = "healthy" ]; then
+              break
+            fi
+            if [ "$health" = "unhealthy" ]; then
+              docker logs "$container_id"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" = "healthy"
+          curl --fail --silent --show-error http://127.0.0.1:8080/health >/dev/null
+
+      - name: Show container logs
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop container
+        if: always()
+        run: docker compose down --volumes

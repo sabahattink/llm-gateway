@@ -156,7 +156,11 @@ func (ah *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
-		ah.store.RecordLoginAttempt(ip, false)
+		if recordErr := ah.store.RecordLoginAttempt(ip, false); recordErr != nil {
+			log.Printf("Failed to record login attempt from %s: %v", ip, recordErr)
+			http.Error(w, "failed to record login attempt", http.StatusInternalServerError)
+			return
+		}
 		log.Printf("Failed login attempt from %s", ip)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
@@ -165,7 +169,11 @@ func (ah *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Success — create session
-	ah.store.RecordLoginAttempt(ip, true)
+	if err := ah.store.RecordLoginAttempt(ip, true); err != nil {
+		log.Printf("Failed to reset login attempts for %s: %v", ip, err)
+		http.Error(w, "failed to reset login attempts", http.StatusInternalServerError)
+		return
+	}
 	token, err := ah.store.CreateSession(sessionDuration)
 	if err != nil {
 		http.Error(w, "failed to create session", http.StatusInternalServerError)
