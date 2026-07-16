@@ -118,6 +118,9 @@ func (p *CohereProvider) ChatCompletion(ctx context.Context, req ChatRequest) (*
 			}
 		}
 	}
+	if cReq.Message == "" {
+		return nil, fmt.Errorf("cohere requires at least one user message")
+	}
 
 	body, err := json.Marshal(cReq)
 	if err != nil {
